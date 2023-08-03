@@ -3,7 +3,6 @@ from datetime import date
 
 
 class Cash_book(BaseModel):
-    id:int = None
     sell_amount: float
     date: date
     profit_percentage: float
@@ -13,8 +12,20 @@ class Cash_book(BaseModel):
         from_attributes = True
 
 class Product_Category(BaseModel):
-    id:int
     name:str
 
+    class Config:
+        from_attributes = True
+
+class Invent(BaseModel):
+    product_name :str
+    quantity :int
+    purchaseFrom :str
+    manufacture :str
+    expiry :date
+    amount :float
+    total :float
+    close :bool
+    
     class Config:
         from_attributes = True
