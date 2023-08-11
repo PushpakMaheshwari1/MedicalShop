@@ -6,7 +6,7 @@ from models import Category,Cashbook,Inventory,User
 from fastapi.encoders import jsonable_encoder
 from oauth2 import get_current_user
 from datetime import datetime,date
-from typing import Annotated
+from fastapi_pagination import Page, Params, paginate
 
 session = Session(bind = engine)
 
@@ -94,14 +94,14 @@ async def create_cashbook(cashbook: Cash_book,current_user : int = Depends(get_c
 
 ## List Cashbook
 
-@inventory_router.get("/cashbook/list")
-async def list_cashbook(current_user : str = Depends(get_current_user)):
+@inventory_router.get("/cashbook/list",response_model=Page[Cash_book])
+async def list_cashbook(params : Params = Depends(),current_user : str = Depends(get_current_user)):
 
         cashbook = session.query(Cashbook).filter(Cashbook.user_id == current_user.id).all()
 
         print(cashbook)
         
-        return jsonable_encoder(cashbook)
+        return paginate(jsonable_encoder(cashbook))
 
 ## Update CashBook 
 
@@ -230,8 +230,9 @@ async def delete_inventory(id:int,current_user: User = Depends(get_current_user)
 
 ## List expiry product
 
-@inventory_router.get("/invent/expiry", status_code=status.HTTP_200_OK)
-async def search_expiry(product_name : str | None = None,
+@inventory_router.get("/invent/expiry", response_model=Page[Invent] ,status_code=status.HTTP_200_OK)
+async def search_expiry(params : Params = Depends(),
+                        product_name : str | None = None,
                         current_user: User = Depends(get_current_user)):
     
     products = session.query(Inventory).filter(and_((Inventory.expiry - date.today()) <= 120  
@@ -240,4 +241,4 @@ async def search_expiry(product_name : str | None = None,
                                                     Inventory.product_name == product_name if product_name is not None else True,
                                                         )    
                                                     )).all()
-    return jsonable_encoder(products)
+    return paginate(jsonable_encoder(products))
