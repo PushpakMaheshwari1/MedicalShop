@@ -1,10 +1,12 @@
 from fastapi import APIRouter,status,Depends,HTTPException
-from sqlalchemy import and_
+from sqlalchemy import and_,or_
 from database import Session,engine
 from schemas import Product_Category,Cash_book,Invent
 from models import Category,Cashbook,Inventory,User
 from fastapi.encoders import jsonable_encoder
 from oauth2 import get_current_user
+from datetime import datetime,date
+from typing import Annotated
 
 session = Session(bind = engine)
 
@@ -134,63 +136,6 @@ async def delete_cashbook(id:int,current_user : int = Depends(get_current_user))
     session.commit()
 
     return cashbook_to_delete
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 ## Add Product
@@ -281,3 +226,18 @@ async def delete_inventory(id:int,current_user: User = Depends(get_current_user)
     session.commit()
 
     return inventory_to_delete
+
+
+## List expiry product
+
+@inventory_router.get("/invent/expiry", status_code=status.HTTP_200_OK)
+async def search_expiry(product_name : str | None = None,
+                        current_user: User = Depends(get_current_user)):
+    
+    products = session.query(Inventory).filter(and_((Inventory.expiry - date.today()) <= 120  
+                                                    ,Inventory.user_id == current_user.id,
+                                                    or_(
+                                                    Inventory.product_name == product_name if product_name is not None else True,
+                                                        )    
+                                                    )).all()
+    return jsonable_encoder(products)
