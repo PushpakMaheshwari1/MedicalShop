@@ -11,6 +11,8 @@ class User(Base):
 
     inventories = relationship('Inventory', back_populates='user')
     cashbooks = relationship('Cashbook', back_populates='user')
+    category = relationship("Category", back_populates='user')
+
 
     def __repr__(self):
         return  f"<User {self.username}>"
@@ -19,8 +21,12 @@ class Category(Base):
     __tablename__ = 'category'
     id = Column(Integer,primary_key=True)
     name = Column(String(75))
-
+    user_id = Column(Integer, ForeignKey('user.id'))
+    user = relationship('User', back_populates='category')
     cashbooks = relationship('Cashbook', back_populates='category')
+
+    def __repr__(self):
+        return f"<User {self.username}>"
 
 
 class Inventory(Base):
@@ -34,7 +40,7 @@ class Inventory(Base):
     amount = Column(Float)
     total = Column(Float)
     close = Column(Boolean)
-
+    
     user_id = Column(Integer, ForeignKey('user.id'))
     user = relationship('User', back_populates='inventories')
 
