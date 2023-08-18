@@ -1,5 +1,5 @@
 from fastapi import APIRouter,status,Depends,HTTPException
-from sqlalchemy import and_,or_
+from sqlalchemy import and_,or_,func,extract
 from database import Session,engine
 from schemas import Product_Category,Cash_book,Invent
 from models import Category,Cashbook,Inventory,User
@@ -19,7 +19,8 @@ inventory_router = APIRouter(
 @inventory_router.post("/category/add",status_code=status.HTTP_201_CREATED)
 async def Add_Category(category : Product_Category,current_user : int = Depends(get_current_user)):
     new_category = Category(
-        name = category.name
+        name = category.name,
+        user_id = current_user.id
     )
 
     session.add(new_category)
@@ -37,9 +38,12 @@ async def Add_Category(category : Product_Category,current_user : int = Depends(
 @inventory_router.put("/category/update/{id}")
 async def update_category(id : int , category : Product_Category,current_user : int = Depends(get_current_user)):
     categorycashbook_to_update = session.query(Category).filter(Category.id == id).first()
-
-    categorycashbook_to_update.name = category.name
-
+    try:
+        categorycashbook_to_update.name = category.name
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Data not Found") 
+         
     session.commit()
 
     response={
@@ -59,9 +63,14 @@ async def list_Categories(current_user : int = Depends(get_current_user)):
 ## Delete Category
 @inventory_router.delete("/category/delete/{id}",status_code=status.HTTP_204_NO_CONTENT)
 async def delete_category(id:int,current_user : int = Depends(get_current_user)):
+    
     category_to_delete = session.query(Category).filter(Category.id == id).first()
     
-    session.delete(category_to_delete)
+    try:
+        session.delete(category_to_delete)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Data not Found") 
 
     session.commit()
 
@@ -108,11 +117,15 @@ async def list_cashbook(params : Params = Depends(),current_user : str = Depends
 @inventory_router.put("/cashbook/update/{id}")
 async def update_cashbook(id : int , cashbook : Cash_book,current_user : int = Depends(get_current_user)):
     cashbook_to_update = session.query(Cashbook).filter(and_(Cashbook.id == id,Cashbook.user_id == current_user.id)).first()
-    cashbook_to_update.sell_amount = cashbook.sell_amount
-    cashbook_to_update.date = cashbook.date
-    cashbook_to_update.profit_percentage = cashbook.profit_percentage
-    cashbook_to_update.category_id = cashbook.category_id
-    
+    try:
+        cashbook_to_update.sell_amount = cashbook.sell_amount
+        cashbook_to_update.date = cashbook.date
+        cashbook_to_update.profit_percentage = cashbook.profit_percentage
+        cashbook_to_update.category_id = cashbook.category_id
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Data not Found") 
+
 
     session.commit()
 
@@ -130,8 +143,11 @@ async def update_cashbook(id : int , cashbook : Cash_book,current_user : int = D
 @inventory_router.delete("/cashbook/delete/{id}",status_code=status.HTTP_204_NO_CONTENT)
 async def delete_cashbook(id:int,current_user : int = Depends(get_current_user)):
     cashbook_to_delete = session.query(Cashbook).filter(and_(Cashbook.id == id, Cashbook.user_id == current_user.id)).first()
-    
-    session.delete(cashbook_to_delete)
+    try: 
+        session.delete(cashbook_to_delete)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Data not Found") 
 
     session.commit()
 
@@ -190,14 +206,18 @@ async def list_inventory(current_user: User = Depends(get_current_user)):
 async def update_inventory(id : int , invent : Invent,current_user : int = Depends(get_current_user)):
     inventory_to_update = session.query(Inventory).filter(and_(Inventory.id == id,Inventory.user_id == current_user.id)).first()
 
-    inventory_to_update.product_name = invent.product_name
-    inventory_to_update.quantity = invent.quantity
-    inventory_to_update.purchaseFrom = invent.purchaseFrom
-    inventory_to_update.manufacture = invent.manufacture
-    inventory_to_update.expiry = invent.expiry
-    inventory_to_update.amount = invent.amount
-    inventory_to_update.total = invent.total
-    inventory_to_update.close = invent.close
+    try:
+        inventory_to_update.product_name = invent.product_name
+        inventory_to_update.quantity = invent.quantity
+        inventory_to_update.purchaseFrom = invent.purchaseFrom
+        inventory_to_update.manufacture = invent.manufacture
+        inventory_to_update.expiry = invent.expiry
+        inventory_to_update.amount = invent.amount
+        inventory_to_update.total = invent.total
+        inventory_to_update.close = invent.close
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Data not Found") 
 
     session.commit()
 
@@ -220,8 +240,11 @@ async def update_inventory(id : int , invent : Invent,current_user : int = Depen
 @inventory_router.delete("/invent/delete/{id}",status_code=status.HTTP_204_NO_CONTENT)
 async def delete_inventory(id:int,current_user: User = Depends(get_current_user)):
     inventory_to_delete = session.query(Inventory).filter(and_(Inventory.id == id, Inventory.user_id == current_user.id)).first()
-    
-    session.delete(inventory_to_delete)
+    try:
+        session.delete(inventory_to_delete)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Data not Found") 
 
     session.commit()
 
@@ -242,3 +265,40 @@ async def search_expiry(params : Params = Depends(),
                                                         )    
                                                     )).all()
     return paginate(jsonable_encoder(products))
+
+## Monthly Summary 
+
+@inventory_router.get("/invent/monthlysummary")
+async def monthly_summary(month : int , id : int , 
+                          profit_percentage : float ,
+                          current_user: User = Depends(get_current_user)):
+    
+    monthly_sell = session.query(func.sum(Cashbook.sell_amount)).filter(Cashbook.user_id == current_user.id,
+                                                                    extract('month', Cashbook.date) == month,
+                                                                    Cashbook.category_id == id).scalar()
+
+    profit = monthly_sell * (profit_percentage / 100)
+    
+    return {
+        "monthly_sell": monthly_sell,
+        "profit": profit
+    }
+
+
+ ## Yearly Summary
+
+@inventory_router.get("/invent/yearlysummary")
+async def monthly_summary(year : int , id : int, 
+                          profit_percentage : float,
+                          current_user: User = Depends(get_current_user)):
+    
+    yearly_sell = session.query(func.sum(Cashbook.sell_amount)).filter(Cashbook.user_id == current_user.id,
+                                                                    extract('year', Cashbook.date) == year,
+                                                                    Cashbook.category_id == id).scalar()
+
+    profit = yearly_sell * (profit_percentage / 100)
+    
+    return {
+        "yearly_sell": yearly_sell,
+        "profit": profit
+    }
